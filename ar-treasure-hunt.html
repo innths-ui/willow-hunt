@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AR Treasure Hunt</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 </head>
 <body>
 <style>
@@ -166,6 +164,13 @@ body {
     width: 100%;
     height: 100%;
     z-index: 1000;
+    background: black;
+}
+
+.ar-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .ar-overlay {
@@ -200,6 +205,7 @@ body {
     border-radius: 8px;
     cursor: pointer;
     pointer-events: all;
+    z-index: 1003;
 }
 
 .capture-btn {
@@ -215,6 +221,38 @@ body {
     font-size: 18px;
     cursor: pointer;
     pointer-events: all;
+    z-index: 1003;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.05); }
+}
+
+.ar-target {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 150px;
+    height: 150px;
+    border: 3px dashed #10b981;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1002;
+}
+
+.ar-target::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    background: #10b981;
+    border-radius: 50%;
 }
 
 .nearby-objects {
@@ -264,6 +302,7 @@ body {
     margin-right: 15px;
 }
 
+/* TV Stream Styles */
 .tv-stream {
     position: fixed;
     top: 0;
@@ -550,12 +589,6 @@ body {
     border: 3px solid white;
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-50%, -50%) scale(1.2); }
 }
 
 .map-object {
@@ -574,6 +607,19 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.permission-notice {
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    color: #92400e;
+}
+
+.permission-notice strong {
+    color: #78350f;
 }
 </style>
 
@@ -624,6 +670,12 @@ body {
 
     <div id="playerPanel" class="panel hidden">
         <h2>🎮 Find Treasures</h2>
+        
+        <div class="permission-notice">
+            <strong>📱 Camera Permission Required!</strong><br>
+            When you tap "Start AR Hunt", please allow camera access. The app needs your camera to show the AR view.
+        </div>
+        
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-value" id="playerScore">0</div>
@@ -658,11 +710,10 @@ body {
 </div>
 
 <div id="arView" class="ar-view hidden">
-    <a-scene embedded arjs="sourceType: webcam;">
-        <a-camera gps-camera rotation-reader></a-camera>
-    </a-scene>
+    <video id="arVideo" class="ar-video" autoplay playsinline></video>
     
     <div class="ar-overlay">
+        <div class="ar-target"></div>
         <div class="ar-hud">
             <h3>Looking for treasures...</h3>
             <p id="arStatus">Move around to find objects!</p>
@@ -746,6 +797,7 @@ let tvStreamActive = false;
 let tvUpdateInterval = null;
 let activityLog = [];
 let recentCaptures = [];
+let arStream = null;
 
 const objectTypes = {
     gem: { emoji: '💎', points: 10 },
@@ -871,15 +923,33 @@ function updateNearbyObjects() {
     `).join('');
 }
 
-function startARHunt() {
+async function startARHunt() {
     if (placedObjects.filter(obj => !obj.collected).length === 0) {
         alert('No objects to find!');
         return;
     }
 
-    document.getElementById('arView').classList.remove('hidden');
-    document.getElementById('mainApp').style.display = 'none';
-    updateARStatus();
+    try {
+        // Request camera access
+        arStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment', // Use back camera
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        
+        const video = document.getElementById('arVideo');
+        video.srcObject = arStream;
+        
+        document.getElementById('arView').classList.remove('hidden');
+        document.getElementById('mainApp').style.display = 'none';
+        
+        updateARStatus();
+    } catch (error) {
+        console.error('Camera error:', error);
+        alert('Camera access denied! Please allow camera permission in your browser settings and try again.');
+    }
 }
 
 function updateARStatus() {
@@ -913,7 +983,6 @@ function captureObject() {
     players[0].score += points;
     players[0].found += 1;
 
-    // Log activity for TV stream
     const activity = {
         player: players[0].name,
         object: nearestObject,
@@ -924,7 +993,6 @@ function captureObject() {
     activityLog.unshift(activity);
     recentCaptures.unshift(activity);
     
-    // Keep only last 50 activities
     if (activityLog.length > 50) activityLog.pop();
     if (recentCaptures.length > 10) recentCaptures.pop();
 
@@ -937,6 +1005,12 @@ function captureObject() {
 }
 
 function closeAR() {
+    // Stop camera stream
+    if (arStream) {
+        arStream.getTracks().forEach(track => track.stop());
+        arStream = null;
+    }
+    
     document.getElementById('arView').classList.add('hidden');
     document.getElementById('mainApp').style.display = 'block';
 }
@@ -1013,14 +1087,13 @@ function simulatePlacedObjects() {
     updateObjectList();
 }
 
+// TV Stream Functions
 function startTVStream() {
     tvStreamActive = true;
     document.getElementById('tvStream').classList.remove('hidden');
     document.getElementById('mainApp').style.display = 'none';
     
-    // Set up 25fps refresh rate (1000ms / 25 = 40ms)
     tvUpdateInterval = setInterval(updateTVDisplay, 40);
-    
     updateTVDisplay();
 }
 
@@ -1036,11 +1109,9 @@ function stopTVStream() {
 }
 
 function updateTVDisplay() {
-    // Update time
     const now = new Date();
     document.getElementById('tvTime').textContent = now.toLocaleTimeString();
     
-    // Update stats
     const totalCaptures = placedObjects.filter(obj => obj.collected).length;
     document.getElementById('tvTotalPlayers').textContent = players.length;
     document.getElementById('tvTotalCaptures').textContent = totalCaptures;
@@ -1052,16 +1123,9 @@ function updateTVDisplay() {
         document.getElementById('tvLastCapture').textContent = timeSince + 's ago';
     }
     
-    // Update leaderboard
     updateTVLeaderboard();
-    
-    // Update activity feed
     updateActivityFeed();
-    
-    // Update recent captures
     updateRecentCaptures();
-    
-    // Update map
     updateTVMap();
 }
 
@@ -1138,10 +1202,8 @@ function updateTVMap() {
         return;
     }
     
-    // Clear existing markers
     canvas.innerHTML = '';
     
-    // Calculate bounds
     const allLats = placedObjects.map(obj => obj.lat);
     const allLngs = placedObjects.map(obj => obj.lng);
     const minLat = Math.min(...allLats);
@@ -1152,7 +1214,6 @@ function updateTVMap() {
     const latRange = maxLat - minLat || 0.01;
     const lngRange = maxLng - minLng || 0.01;
     
-    // Add objects to map
     placedObjects.forEach(obj => {
         if (!obj.collected) {
             const x = ((obj.lng - minLng) / lngRange) * 100;
@@ -1168,10 +1229,8 @@ function updateTVMap() {
         }
     });
     
-    // Add player markers
     players.forEach((player, index) => {
         if (currentLocation) {
-            // Simulate player positions near current location
             const offsetLat = currentLocation.lat + (Math.random() - 0.5) * latRange * 0.5;
             const offsetLng = currentLocation.lng + (Math.random() - 0.5) * lngRange * 0.5;
             
@@ -1188,16 +1247,14 @@ function updateTVMap() {
     });
 }
 
-// Simulate random player activity for demo
 function simulatePlayerActivity() {
     if (!tvStreamActive || placedObjects.filter(obj => !obj.collected).length === 0) return;
     
-    // Random chance of a player making a capture
     if (Math.random() < 0.1) {
         const uncollected = placedObjects.filter(obj => !obj.collected);
         if (uncollected.length > 0) {
             const randomObj = uncollected[Math.floor(Math.random() * uncollected.length)];
-            const randomPlayer = players[Math.floor(Math.random() * (players.length - 1)) + 1]; // Not "You"
+            const randomPlayer = players[Math.floor(Math.random() * (players.length - 1)) + 1];
             
             randomObj.collected = true;
             const points = objectTypes[randomObj.type].points;
@@ -1226,7 +1283,6 @@ setInterval(() => {
     if (currentMode === 'player') getCurrentLocation();
 }, 5000);
 
-// Simulate player activity every 10 seconds for TV demo
 setInterval(() => {
     if (tvStreamActive) simulatePlayerActivity();
 }, 10000);
