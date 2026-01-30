@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Treasure Hunt</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+<body>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.header h1 {
+    color: #667eea;
+    margin-bottom: 10px;
+}
+
+.mode-toggle {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.mode-btn.active {
+    background: #667eea;
+    color: white;
+}
+
+.mode-btn:not(.active) {
+    background: #e0e7ff;
+    color: #667eea;
+}
+
+.panel {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: bold;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e7ff;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.object-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.object-item {
+    background: #f9fafb;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    border-left: 4px solid #667eea;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 14px;
+    border-radius: 6px;
+}
+
+.ar-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+}
+
+.ar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1001;
+}
+
+.ar-hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    background: rgba(255,255,255,0.95);
+    padding: 20px;
+    border-radius: 10px;
+    pointer-events: all;
+}
+
+.close-ar {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.capture-btn {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 20px 40px;
+    border-radius: 50px;
+    font-size: 18px;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.nearby-objects {
+    margin-top: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.nearby-item {
+    background: #f0f9ff;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.distance {
+    background: #667eea;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.hidden {
+    display: none;
+}
+
+.leaderboard-item {
+    display: flex;
+    padding: 12px;
+    background: #f9fafb;
+    margin-bottom: 8px;
+    border-radius: 8px;
+}
+
+.rank {
+    width: 40px;
+    height: 40px;
+    background: #667eea;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+}
+
+.tv-stream {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0f172a;
+    color: white;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+}
+
+.tv-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.tv-logo {
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.tv-time {
+    font-size: 24px;
+    font-family: monospace;
+}
+
+.tv-content {
+    flex: 1;
+    display: flex;
+    padding: 20px;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.tv-main {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.tv-map {
+    flex: 1;
+    background: #1e293b;
+    border-radius: 15px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.map-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #60a5fa;
+}
+
+#mapCanvas {
+    width: 100%;
+    height: calc(100% - 50px);
+    background: #0f172a;
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.tv-feed {
+    flex: 1;
+    background: #1e293b;
+    border-radius: 15px;
+    padding: 20px;
+}
+
+.tv-feed h3 {
+    margin-bottom: 15px;
+    color: #60a5fa;
+}
+
+.activity-feed {
+    height: calc(100% - 50px);
+    overflow-y: auto;
+}
+
+.activity-item {
+    background: #334155;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid #10b981;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.activity-time {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+.tv-sidebar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.tv-leaderboard, .tv-stats, .tv-recent {
+    background: #1e293b;
+    border-radius: 15px;
+    padding: 20px;
+}
+
+.tv-leaderboard h3, .tv-stats h3, .tv-recent h3 {
+    margin-bottom: 15px;
+    color: #60a5fa;
+}
+
+.tv-leaderboard {
+    flex: 1.5;
+}
+
+.tv-player-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #334155;
+    border-radius: 8px;
+}
+
+.tv-rank {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-right: 15px;
+}
+
+.tv-rank.gold {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.tv-rank.silver {
+    background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+}
+
+.tv-rank.bronze {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+.tv-rank.other {
+    background: #475569;
+}
+
+.tv-player-info {
+    flex: 1;
+}
+
+.tv-player-name {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.tv-player-score {
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+.tv-player-points {
+    font-size: 28px;
+    font-weight: bold;
+    color: #10b981;
+}
+
+.tv-stats {
+    flex: 1;
+}
+
+.tv-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.tv-stat-item {
+    background: #334155;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.tv-stat-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #10b981;
+}
+
+.tv-stat-label {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+.tv-recent {
+    flex: 1;
+}
+
+.recent-capture-item {
+    background: #334155;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+.capture-emoji {
+    font-size: 24px;
+}
+
+.capture-info {
+    flex: 1;
+    margin-left: 10px;
+}
+
+.capture-player {
+    font-weight: 600;
+}
+
+.capture-points {
+    font-size: 12px;
+    color: #10b981;
+}
+
+.tv-footer {
+    background: #1e293b;
+    padding: 15px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    border-top: 2px solid #334155;
+}
+
+.streaming-indicator {
+    color: #ef4444;
+    font-weight: bold;
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0.5; }
+}
+
+.map-player {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: #3b82f6;
+    border: 3px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.2); }
+}
+
+.map-object {
+    position: absolute;
+    font-size: 24px;
+    transform: translate(-50%, -50%);
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+    50% { transform: translate(-50%, -50%) translateY(-10px); }
+}
+
+.tv-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+</style>
+
+<div class="container" id="mainApp">
+    <div class="header">
+        <h1>🎯 AR Treasure Hunt</h1>
+        <p>Place AR objects and let users find them!</p>
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="switchMode('admin')">👑 Admin</button>
+            <button class="mode-btn" onclick="switchMode('player')">🎮 Player</button>
+            <button class="mode-btn" onclick="switchMode('tv')">📺 TV Stream</button>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="panel">
+        <h2>📍 Place AR Objects</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalObjects">0</div>
+                <div>Objects Placed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalCollected">0</div>
+                <div>Collected</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Object Type</label>
+            <select id="objectType">
+                <option value="gem">💎 Gem (10 pts)</option>
+                <option value="coin">🪙 Coin (5 pts)</option>
+                <option value="star">⭐ Star (15 pts)</option>
+                <option value="trophy">🏆 Trophy (25 pts)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Location Name</label>
+            <input type="text" id="locationName" placeholder="e.g., Park, Coffee Shop">
+        </div>
+
+        <button class="btn btn-primary" onclick="placeObject()">📍 Place Object</button>
+
+        <h3 style="margin-top: 20px;">Placed Objects</h3>
+        <div class="object-list" id="objectList"></div>
+    </div>
+
+    <div id="playerPanel" class="panel hidden">
+        <h2>🎮 Find Treasures</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="playerScore">0</div>
+                <div>Your Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="itemsFound">0</div>
+                <div>Items Found</div>
+            </div>
+        </div>
+
+        <button class="btn btn-success" onclick="startARHunt()">📱 Start AR Hunt</button>
+
+        <h3 style="margin-top: 20px;">Nearby Objects</h3>
+        <div class="nearby-objects" id="nearbyObjects"></div>
+
+        <h3 style="margin-top: 20px;">🏆 Leaderboard</h3>
+        <div id="leaderboard"></div>
+    </div>
+
+    <div id="tvPanel" class="panel hidden">
+        <h2>📺 Live TV Stream - 1920x1080 @ 25fps</h2>
+        <div class="tv-controls">
+            <button class="btn btn-success" onclick="startTVStream()">📡 Start Broadcast</button>
+            <button class="btn btn-danger" onclick="stopTVStream()" style="margin-top: 10px;">⏹️ Stop Broadcast</button>
+        </div>
+        <p style="margin-top: 15px; color: #666;">
+            Instructions: Click "Start Broadcast" then open this page on your TV browser in fullscreen (F11). 
+            The stream will display all active players and their captures in real-time.
+        </p>
+    </div>
+</div>
+
+<div id="arView" class="ar-view hidden">
+    <a-scene embedded arjs="sourceType: webcam;">
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
+    
+    <div class="ar-overlay">
+        <div class="ar-hud">
+            <h3>Looking for treasures...</h3>
+            <p id="arStatus">Move around to find objects!</p>
+        </div>
+        <button class="close-ar" onclick="closeAR()">✕ Exit</button>
+        <button class="capture-btn" onclick="captureObject()">🎯 Capture</button>
+    </div>
+</div>
+
+<div id="tvStream" class="tv-stream hidden">
+    <div class="tv-header">
+        <div class="tv-logo">🎯 AR TREASURE HUNT - LIVE</div>
+        <div class="tv-time" id="tvTime"></div>
+    </div>
+    
+    <div class="tv-content">
+        <div class="tv-main">
+            <div class="tv-map" id="tvMap">
+                <div class="map-title">🗺️ LIVE MAP</div>
+                <div id="mapCanvas"></div>
+            </div>
+            
+            <div class="tv-feed">
+                <h3>📡 LIVE ACTIVITY FEED</h3>
+                <div class="activity-feed" id="activityFeed"></div>
+            </div>
+        </div>
+        
+        <div class="tv-sidebar">
+            <div class="tv-leaderboard">
+                <h3>🏆 TOP PLAYERS</h3>
+                <div id="tvLeaderboard"></div>
+            </div>
+            
+            <div class="tv-stats">
+                <h3>📊 GAME STATS</h3>
+                <div class="tv-stat-grid">
+                    <div class="tv-stat-item">
+                        <div class="tv-stat-value" id="tvTotalPlayers">0</div>
+                        <div class="tv-stat-label">Active Players</div>
+                    </div>
+                    <div class="tv-stat-item">
+                        <div class="tv-stat-value" id="tvTotalCaptures">0</div>
+                        <div class="tv-stat-label">Total Captures</div>
+                    </div>
+                    <div class="tv-stat-item">
+                        <div class="tv-stat-value" id="tvObjectsRemaining">0</div>
+                        <div class="tv-stat-label">Objects Left</div>
+                    </div>
+                    <div class="tv-stat-item">
+                        <div class="tv-stat-value" id="tvLastCapture">-</div>
+                        <div class="tv-stat-label">Last Capture</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tv-recent">
+                <h3>⚡ RECENT CAPTURES</h3>
+                <div id="recentCaptures"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tv-footer">
+        <div class="streaming-indicator">🔴 LIVE</div>
+        <div>1920x1080 @ 25fps</div>
+    </div>
+</div>
+
+<script>
+let placedObjects = [];
+let players = [
+    { name: 'You', score: 0, found: 0 },
+    { name: 'Player 2', score: 125, found: 8 },
+    { name: 'Player 3', score: 98, found: 6 }
+];
+let currentMode = 'admin';
+let currentLocation = null;
+let nearestObject = null;
+let tvStreamActive = false;
+let tvUpdateInterval = null;
+let activityLog = [];
+let recentCaptures = [];
+
+const objectTypes = {
+    gem: { emoji: '💎', points: 10 },
+    coin: { emoji: '🪙', points: 5 },
+    star: { emoji: '⭐', points: 15 },
+    trophy: { emoji: '🏆', points: 25 }
+};
+
+function init() {
+    updateStats();
+    updateObjectList();
+    updateLeaderboard();
+    getCurrentLocation();
+    simulatePlacedObjects();
+}
+
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                currentLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                };
+                updateNearbyObjects();
+            },
+            () => {
+                currentLocation = { lat: 37.7749, lng: -122.4194 };
+                updateNearbyObjects();
+            }
+        );
+    } else {
+        currentLocation = { lat: 37.7749, lng: -122.4194 };
+        updateNearbyObjects();
+    }
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    document.getElementById('adminPanel').classList.add('hidden');
+    document.getElementById('playerPanel').classList.add('hidden');
+    document.getElementById('tvPanel').classList.add('hidden');
+
+    if (mode === 'admin') {
+        document.getElementById('adminPanel').classList.remove('hidden');
+    } else if (mode === 'player') {
+        document.getElementById('playerPanel').classList.remove('hidden');
+        updateNearbyObjects();
+    } else if (mode === 'tv') {
+        document.getElementById('tvPanel').classList.remove('hidden');
+    }
+}
+
+function placeObject() {
+    const type = document.getElementById('objectType').value;
+    const name = document.getElementById('locationName').value || 'Unknown';
+
+    if (!currentLocation) {
+        alert('Getting location...');
+        return;
+    }
+
+    const object = {
+        id: Date.now(),
+        type: type,
+        locationName: name,
+        lat: currentLocation.lat + (Math.random() - 0.5) * 0.01,
+        lng: currentLocation.lng + (Math.random() - 0.5) * 0.01,
+        collected: false,
+        placedAt: new Date().toISOString()
+    };
+
+    placedObjects.push(object);
+    updateStats();
+    updateObjectList();
+    updateNearbyObjects();
+    document.getElementById('locationName').value = '';
+}
+
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function updateNearbyObjects() {
+    if (!currentLocation || currentMode !== 'player') return;
+
+    const nearbyList = document.getElementById('nearbyObjects');
+    const uncollected = placedObjects.filter(obj => !obj.collected);
+    
+    const withDistance = uncollected.map(obj => ({
+        ...obj,
+        distance: calculateDistance(currentLocation.lat, currentLocation.lng, obj.lat, obj.lng)
+    })).sort((a, b) => a.distance - b.distance);
+
+    if (withDistance.length === 0) {
+        nearbyList.innerHTML = '<p style="padding: 20px; text-align: center;">No objects nearby!</p>';
+        return;
+    }
+
+    nearestObject = withDistance[0];
+
+    nearbyList.innerHTML = withDistance.slice(0, 5).map(obj => `
+        <div class="nearby-item">
+            <div>
+                <span style="font-size: 20px;">${objectTypes[obj.type].emoji}</span>
+                <strong>${obj.locationName}</strong>
+            </div>
+            <div class="distance">${obj.distance < 1000 ? Math.round(obj.distance) + 'm' : (obj.distance/1000).toFixed(1) + 'km'}</div>
+        </div>
+    `).join('');
+}
+
+function startARHunt() {
+    if (placedObjects.filter(obj => !obj.collected).length === 0) {
+        alert('No objects to find!');
+        return;
+    }
+
+    document.getElementById('arView').classList.remove('hidden');
+    document.getElementById('mainApp').style.display = 'none';
+    updateARStatus();
+}
+
+function updateARStatus() {
+    const status = document.getElementById('arStatus');
+    if (nearestObject) {
+        const dist = calculateDistance(currentLocation.lat, currentLocation.lng, nearestObject.lat, nearestObject.lng);
+        
+        if (dist < 10) {
+            status.innerHTML = '<strong style="color: #10b981;">🎯 Very close! Tap CAPTURE!</strong>';
+        } else if (dist < 50) {
+            status.innerHTML = '<strong>📍 Nearby (' + Math.round(dist) + 'm)</strong>';
+        } else {
+            status.innerHTML = 'Keep moving! ' + Math.round(dist) + 'm away';
+        }
+    }
+}
+
+function captureObject() {
+    if (!nearestObject) return;
+
+    const dist = calculateDistance(currentLocation.lat, currentLocation.lng, nearestObject.lat, nearestObject.lng);
+
+    if (dist > 50) {
+        alert('Too far! Get within 50m.');
+        return;
+    }
+
+    nearestObject.collected = true;
+    const points = objectTypes[nearestObject.type].points;
+    
+    players[0].score += points;
+    players[0].found += 1;
+
+    // Log activity for TV stream
+    const activity = {
+        player: players[0].name,
+        object: nearestObject,
+        points: points,
+        time: new Date().toISOString(),
+        timestamp: Date.now()
+    };
+    activityLog.unshift(activity);
+    recentCaptures.unshift(activity);
+    
+    // Keep only last 50 activities
+    if (activityLog.length > 50) activityLog.pop();
+    if (recentCaptures.length > 10) recentCaptures.pop();
+
+    alert('🎉 Captured! +' + points + ' points!');
+    
+    updateStats();
+    updateNearbyObjects();
+    updateLeaderboard();
+    closeAR();
+}
+
+function closeAR() {
+    document.getElementById('arView').classList.add('hidden');
+    document.getElementById('mainApp').style.display = 'block';
+}
+
+function updateStats() {
+    document.getElementById('totalObjects').textContent = placedObjects.length;
+    document.getElementById('totalCollected').textContent = placedObjects.filter(obj => obj.collected).length;
+    document.getElementById('playerScore').textContent = players[0].score;
+    document.getElementById('itemsFound').textContent = players[0].found;
+}
+
+function updateObjectList() {
+    const list = document.getElementById('objectList');
+    if (placedObjects.length === 0) {
+        list.innerHTML = '<p style="padding: 20px; text-align: center;">No objects yet</p>';
+        return;
+    }
+
+    list.innerHTML = placedObjects.slice().reverse().map(obj => `
+        <div class="object-item">
+            <div>
+                <div><span style="font-size: 20px;">${objectTypes[obj.type].emoji}</span> ${obj.locationName} ${obj.collected ? '✓' : ''}</div>
+                <div style="font-size: 14px; color: #666;">${objectTypes[obj.type].points} points</div>
+            </div>
+            <button class="btn btn-danger btn-small" onclick="removeObject(${obj.id})">Remove</button>
+        </div>
+    `).join('');
+}
+
+function removeObject(id) {
+    placedObjects = placedObjects.filter(obj => obj.id !== id);
+    updateStats();
+    updateObjectList();
+    updateNearbyObjects();
+}
+
+function updateLeaderboard() {
+    const sorted = [...players].sort((a, b) => b.score - a.score);
+    
+    const board = document.getElementById('leaderboard');
+    board.innerHTML = sorted.map((p, i) => `
+        <div class="leaderboard-item">
+            <div class="rank">${i + 1}</div>
+            <div style="flex: 1;">
+                <div style="font-weight: 600;">${p.name}</div>
+                <div style="font-size: 14px; color: #666;">${p.found} items</div>
+            </div>
+            <div style="font-size: 20px; font-weight: bold;">${p.score}</div>
+        </div>
+    `).join('');
+}
+
+function simulatePlacedObjects() {
+    if (!currentLocation) return;
+    
+    const demos = [
+        { type: 'trophy', name: 'Central Park' },
+        { type: 'gem', name: 'Coffee Shop' },
+        { type: 'star', name: 'Library' }
+    ];
+
+    demos.forEach((d, i) => {
+        placedObjects.push({
+            id: Date.now() + i,
+            type: d.type,
+            locationName: d.name,
+            lat: currentLocation.lat + (Math.random() - 0.5) * 0.02,
+            lng: currentLocation.lng + (Math.random() - 0.5) * 0.02,
+            collected: false,
+            placedAt: new Date().toISOString()
+        });
+    });
+    updateStats();
+    updateObjectList();
+}
+
+function startTVStream() {
+    tvStreamActive = true;
+    document.getElementById('tvStream').classList.remove('hidden');
+    document.getElementById('mainApp').style.display = 'none';
+    
+    // Set up 25fps refresh rate (1000ms / 25 = 40ms)
+    tvUpdateInterval = setInterval(updateTVDisplay, 40);
+    
+    updateTVDisplay();
+}
+
+function stopTVStream() {
+    tvStreamActive = false;
+    document.getElementById('tvStream').classList.add('hidden');
+    document.getElementById('mainApp').style.display = 'block';
+    
+    if (tvUpdateInterval) {
+        clearInterval(tvUpdateInterval);
+        tvUpdateInterval = null;
+    }
+}
+
+function updateTVDisplay() {
+    // Update time
+    const now = new Date();
+    document.getElementById('tvTime').textContent = now.toLocaleTimeString();
+    
+    // Update stats
+    const totalCaptures = placedObjects.filter(obj => obj.collected).length;
+    document.getElementById('tvTotalPlayers').textContent = players.length;
+    document.getElementById('tvTotalCaptures').textContent = totalCaptures;
+    document.getElementById('tvObjectsRemaining').textContent = placedObjects.filter(obj => !obj.collected).length;
+    
+    if (recentCaptures.length > 0) {
+        const lastCapture = recentCaptures[0];
+        const timeSince = Math.floor((Date.now() - lastCapture.timestamp) / 1000);
+        document.getElementById('tvLastCapture').textContent = timeSince + 's ago';
+    }
+    
+    // Update leaderboard
+    updateTVLeaderboard();
+    
+    // Update activity feed
+    updateActivityFeed();
+    
+    // Update recent captures
+    updateRecentCaptures();
+    
+    // Update map
+    updateTVMap();
+}
+
+function updateTVLeaderboard() {
+    const sorted = [...players].sort((a, b) => b.score - a.score);
+    const board = document.getElementById('tvLeaderboard');
+    
+    board.innerHTML = sorted.slice(0, 5).map((p, i) => {
+        let rankClass = 'other';
+        if (i === 0) rankClass = 'gold';
+        else if (i === 1) rankClass = 'silver';
+        else if (i === 2) rankClass = 'bronze';
+        
+        return `
+            <div class="tv-player-item">
+                <div class="tv-rank ${rankClass}">${i + 1}</div>
+                <div class="tv-player-info">
+                    <div class="tv-player-name">${p.name}</div>
+                    <div class="tv-player-score">${p.found} items found</div>
+                </div>
+                <div class="tv-player-points">${p.score}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateActivityFeed() {
+    const feed = document.getElementById('activityFeed');
+    
+    if (activityLog.length === 0) {
+        feed.innerHTML = '<div style="text-align: center; color: #64748b; padding: 40px;">Waiting for player activity...</div>';
+        return;
+    }
+    
+    feed.innerHTML = activityLog.slice(0, 10).map(activity => {
+        const timeAgo = Math.floor((Date.now() - activity.timestamp) / 1000);
+        return `
+            <div class="activity-item">
+                <div>
+                    <strong>${activity.player}</strong> captured 
+                    ${objectTypes[activity.object.type].emoji} <strong>${activity.object.locationName}</strong>
+                    <span style="color: #10b981; font-weight: bold;">+${activity.points} pts</span>
+                </div>
+                <div class="activity-time">${timeAgo}s ago</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateRecentCaptures() {
+    const recent = document.getElementById('recentCaptures');
+    
+    if (recentCaptures.length === 0) {
+        recent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No captures yet</div>';
+        return;
+    }
+    
+    recent.innerHTML = recentCaptures.map(capture => `
+        <div class="recent-capture-item">
+            <div class="capture-emoji">${objectTypes[capture.object.type].emoji}</div>
+            <div class="capture-info">
+                <div class="capture-player">${capture.player}</div>
+                <div class="capture-points">+${capture.points} points</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateTVMap() {
+    const canvas = document.getElementById('mapCanvas');
+    
+    if (!currentLocation || placedObjects.length === 0) {
+        canvas.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b;">Initializing map...</div>';
+        return;
+    }
+    
+    // Clear existing markers
+    canvas.innerHTML = '';
+    
+    // Calculate bounds
+    const allLats = placedObjects.map(obj => obj.lat);
+    const allLngs = placedObjects.map(obj => obj.lng);
+    const minLat = Math.min(...allLats);
+    const maxLat = Math.max(...allLats);
+    const minLng = Math.min(...allLngs);
+    const maxLng = Math.max(...allLngs);
+    
+    const latRange = maxLat - minLat || 0.01;
+    const lngRange = maxLng - minLng || 0.01;
+    
+    // Add objects to map
+    placedObjects.forEach(obj => {
+        if (!obj.collected) {
+            const x = ((obj.lng - minLng) / lngRange) * 100;
+            const y = ((obj.lat - minLat) / latRange) * 100;
+            
+            const marker = document.createElement('div');
+            marker.className = 'map-object';
+            marker.textContent = objectTypes[obj.type].emoji;
+            marker.style.left = x + '%';
+            marker.style.top = (100 - y) + '%';
+            marker.title = obj.locationName;
+            canvas.appendChild(marker);
+        }
+    });
+    
+    // Add player markers
+    players.forEach((player, index) => {
+        if (currentLocation) {
+            // Simulate player positions near current location
+            const offsetLat = currentLocation.lat + (Math.random() - 0.5) * latRange * 0.5;
+            const offsetLng = currentLocation.lng + (Math.random() - 0.5) * lngRange * 0.5;
+            
+            const x = ((offsetLng - minLng) / lngRange) * 100;
+            const y = ((offsetLat - minLat) / latRange) * 100;
+            
+            const playerMarker = document.createElement('div');
+            playerMarker.className = 'map-player';
+            playerMarker.style.left = x + '%';
+            playerMarker.style.top = (100 - y) + '%';
+            playerMarker.title = player.name;
+            canvas.appendChild(playerMarker);
+        }
+    });
+}
+
+// Simulate random player activity for demo
+function simulatePlayerActivity() {
+    if (!tvStreamActive || placedObjects.filter(obj => !obj.collected).length === 0) return;
+    
+    // Random chance of a player making a capture
+    if (Math.random() < 0.1) {
+        const uncollected = placedObjects.filter(obj => !obj.collected);
+        if (uncollected.length > 0) {
+            const randomObj = uncollected[Math.floor(Math.random() * uncollected.length)];
+            const randomPlayer = players[Math.floor(Math.random() * (players.length - 1)) + 1]; // Not "You"
+            
+            randomObj.collected = true;
+            const points = objectTypes[randomObj.type].points;
+            randomPlayer.score += points;
+            randomPlayer.found += 1;
+            
+            const activity = {
+                player: randomPlayer.name,
+                object: randomObj,
+                points: points,
+                time: new Date().toISOString(),
+                timestamp: Date.now()
+            };
+            activityLog.unshift(activity);
+            recentCaptures.unshift(activity);
+            
+            if (activityLog.length > 50) activityLog.pop();
+            if (recentCaptures.length > 10) recentCaptures.pop();
+        }
+    }
+}
+
+init();
+
+setInterval(() => {
+    if (currentMode === 'player') getCurrentLocation();
+}, 5000);
+
+// Simulate player activity every 10 seconds for TV demo
+setInterval(() => {
+    if (tvStreamActive) simulatePlayerActivity();
+}, 10000);
+</script>
+</body>
+</html>
